@@ -13,29 +13,6 @@ public class ScraperDbContext(DbContextOptions<ScraperDbContext> options)
     {
         base.OnModelCreating(modelBuilder);
 
-        var entity = modelBuilder.Entity<ScrapedItem>();
-
-        entity.Property(p => p.Title)
-            .IsRequired()
-            .HasMaxLength(256);
-
-        entity.Property(p => p.Url)
-            .IsRequired()
-            .HasMaxLength(2048);
-
-        entity.Property(p => p.Source)
-            .HasMaxLength(128);
-
-        entity.Property(p => p.Summary)
-            .HasMaxLength(1024);
-
-        entity.Property(p => p.CollectedAt)
-            .HasDefaultValueSql("GETUTCDATE()");
-
-        entity.Property(p => p.MetadataJson)
-            .HasColumnType("NVARCHAR(MAX)");
-
-        entity.HasIndex(p => p.Url);
-        entity.HasIndex(p => p.Source);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ScraperDbContext).Assembly);
     }
 }
