@@ -4,6 +4,7 @@ using CrawlerApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CrawlerApi.Data.Migrations
 {
     [DbContext(typeof(ScraperDbContext))]
-    partial class ScraperDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251018060405_OptimizeScrapedItemIndexes")]
+    partial class OptimizeScrapedItemIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

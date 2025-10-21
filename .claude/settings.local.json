@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(dotnet add backend/CrawlerApi/CrawlerApi.csproj package FluentValidation.AspNetCore)",
+      "Bash(dotnet ef migrations add OptimizeScrapedItemIndexes --output-dir Data/Migrations)",
+      "Bash(dotnet build)"
     ],
     "deny": [],
     "ask": []

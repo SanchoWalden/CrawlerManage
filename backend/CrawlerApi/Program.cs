@@ -2,11 +2,15 @@ using System.Text;
 using System.Text.Json;
 using CrawlerApi.Constants;
 using CrawlerApi.Data;
+using CrawlerApi.Extensions;
+using CrawlerApi.Middleware;
 using CrawlerApi.Models;
 using CrawlerApi.Models.Dtos;
 using CrawlerApi.Models.Dtos.Auth;
 using CrawlerApi.Options;
 using CrawlerApi.Services;
+using CrawlerApi.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +19,7 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -52,18 +57,41 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
+
+var corsOptions = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>()
+    ?? new CorsOptions();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Default", policy =>
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    {
+        if (corsOptions.AllowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(corsOptions.AllowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
+        {
+            // Fallback for production - should be configured via environment variables
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+    });
 });
 
 builder.Services.AddDbContext<ScraperDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("Default")
-        ?? throw new InvalidOperationException("Connection string 'Default' was not found.");
+    var connectionString = builder.Configuration.GetConnectionString("Default");
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException(
+            "Connection string 'Default' is not configured. " +
+            "Please set it in appsettings.json, User Secrets, or environment variables.");
+    }
 
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
 });
@@ -137,6 +165,8 @@ await using (var scope = app.Services.CreateAsyncScope())
     }
 }
 
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -171,12 +201,12 @@ authGroup.MapPost("/register", async (
 
     if (await userManager.FindByEmailAsync(email) is not null)
     {
-        return Results.Conflict(new { message = "¸ÃÓÊÏäÒÑ×¢²á" });
+        return Results.Conflict(new { message = "ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½" });
     }
 
     if (await userManager.FindByNameAsync(userName) is not null)
     {
-        return Results.Conflict(new { message = "¸ÃÓÃ»§ÃûÒÑ´æÔÚ" });
+        return Results.Conflict(new { message = "ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½Ñ´ï¿½ï¿½ï¿½" });
     }
 
     var user = new AppUser
@@ -225,12 +255,12 @@ authGroup.MapPost("/login", async (
 
     if (user is null)
     {
-        return Results.BadRequest(new { message = "ÕËºÅ»òÃÜÂë´íÎó" });
+        return Results.BadRequest(new { message = "ï¿½ËºÅ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" });
     }
 
     if (!await userManager.CheckPasswordAsync(user, request.Password))
     {
-        return Results.BadRequest(new { message = "ÕËºÅ»òÃÜÂë´íÎó" });
+        return Results.BadRequest(new { message = "ï¿½ËºÅ»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" });
     }
 
     var tokenResult = await tokenService.GenerateTokenAsync(user, cancellationToken);
@@ -307,9 +337,20 @@ scrapedItemsGroup.MapGet("/{id:int}", async (int id, ScraperDbContext db, Cancel
 
 scrapedItemsGroup.MapPost("", async (
     CreateScrapedItemRequest request,
+    IValidator<CreateScrapedItemRequest> validator,
     ScraperDbContext db,
     CancellationToken cancellationToken) =>
 {
+    var validationResult = await validator.ValidateAsync(request, cancellationToken);
+
+    if (!validationResult.IsValid)
+    {
+        var errors = validationResult.Errors
+            .GroupBy(e => e.PropertyName)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+        return Results.ValidationProblem(errors);
+    }
+
     var entity = new ScrapedItem
     {
         Title = request.Title,
